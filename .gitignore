@@ -1,0 +1,5 @@
+/.clangd/
+/.dir-locals.el
+*.o
+/sshforward
+/compile_commands.json
