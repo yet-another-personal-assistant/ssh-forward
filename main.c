@@ -78,7 +78,6 @@ struct ssh_channel_callbacks_struct cb = {
 
 int mainloop(ssh_event event, ssh_channel chan, int sock) {
   int result = -1;
-  ssh_session session = ssh_channel_get_session(chan);
   short events = POLLIN | POLLPRI | POLLERR | POLLHUP | POLLNVAL;
 
   cb.userdata = &sock;
@@ -196,6 +195,48 @@ out:
   return result;
 }
 
+int make_addr(const char *host, const char *service, struct addrinfo *result) {
+  struct addrinfo hints, *ai, *rp;
+  hints.ai_family = AF_UNSPEC;
+  hints.ai_socktype = SOCK_STREAM;
+  if (getaddrinfo(host, service, &hints, &ai) != 0) {
+    perror("getaddrinfo");
+    exit(EXIT_FAILURE);
+  }
+
+  bzero(result, sizeof(struct addrinfo));
+
+  for (rp = ai; rp != NULL; rp = rp->ai_next) {
+    int sock = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
+    if (sock == -1)
+      continue;
+    if (connect(sock, rp->ai_addr, rp->ai_addrlen) != -1) {
+      close(sock);
+      break;
+    }
+    close(sock);
+  }
+
+  if (rp == NULL) {
+    printf("Could not connect\n");
+    return -1;
+  }
+
+  result->ai_family = rp->ai_family;
+  result->ai_socktype = rp->ai_socktype;
+  result->ai_protocol = rp->ai_protocol;
+  result->ai_addrlen = rp->ai_addrlen;
+  result->ai_addr = malloc(rp->ai_addrlen);
+  if (result->ai_addr == NULL) {
+    perror("malloc addr");
+    exit(EXIT_FAILURE);
+  }
+  memcpy(result->ai_addr, rp->ai_addr, rp->ai_addrlen);
+
+  freeaddrinfo(ai);
+  return 0;
+}
+
 int main(int argc, char *argv[]) {
   if (argc < 5 || argc > 6) {
     printf("Usage: %s <user> <key> <host> <port> [<local port>]\n", argv[0]);
@@ -215,47 +256,8 @@ int main(int argc, char *argv[]) {
     port = 3000;
 
   struct addrinfo target = {0};
-
-  {
-    struct addrinfo *result, *rp;
-    target.ai_family = AF_UNSPEC;
-    target.ai_socktype = SOCK_STREAM;
-    if (getaddrinfo(argv[3], argv[4], &target, &result) != 0) {
-      perror("getaddrinfo");
-      exit(EXIT_FAILURE);
-    }
-
-    bzero(&target, sizeof(target));
-
-    for (rp = result; rp != NULL; rp = rp->ai_next) {
-      int sock = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-      if (sock == -1)
-        continue;
-      if (connect(sock, rp->ai_addr, rp->ai_addrlen) != -1) {
-        close(sock);
-        break;
-      }
-      close(sock);
-    }
-
-    if (rp == NULL) {
-      printf("Could not connect\n");
-      exit(EXIT_FAILURE);
-    }
-
-    target.ai_family = rp->ai_family;
-    target.ai_socktype = rp->ai_socktype;
-    target.ai_protocol = rp->ai_protocol;
-    target.ai_addrlen = rp->ai_addrlen;
-    target.ai_addr = malloc(rp->ai_addrlen);
-    if (target.ai_addr == NULL) {
-      perror("malloc addr");
-      exit(EXIT_FAILURE);
-    }
-    memcpy(target.ai_addr, rp->ai_addr, rp->ai_addrlen);
-
-    freeaddrinfo(result);
-  }
+  if (make_addr(argv[3], argv[4], &target) == -1)
+    exit(EXIT_FAILURE);
 
   const char *username = strdup(argv[1]);
   ssh_key key = ssh_key_new();
