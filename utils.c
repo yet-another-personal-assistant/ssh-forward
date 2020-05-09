@@ -7,7 +7,7 @@
 #include "server.h"
 #include "utils.h"
 
-int make_addr(const char *host, const char *service, struct addrinfo *result) {
+static int make_addr(const char *host, const char *service, struct addrinfo *result) {
   struct addrinfo hints, *ai, *rp;
   hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_STREAM;
@@ -56,13 +56,13 @@ static void usage(const char *appname) {
   printf("  local port - where to listen (default 3000)\n");
 }
 
-int parse_args(int argc, char *argv[], struct forward_server_data *fs_data) {
+int parse_args(int argc, char *argv[], struct forward_server_data *fs_data, unsigned int *port) {
   switch (argc) {
   case 5:
-    fs_data->port = 3000;
+    *port = 3000;
     break;
   case 6:
-    if (sscanf(argv[5], "%d", &fs_data->port) != 1) {
+    if (sscanf(argv[5], "%d", port) != 1) {
       printf("port is not a number: %s\n", argv[5]);
       return -1;
     }

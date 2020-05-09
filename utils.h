@@ -5,7 +5,6 @@
 
 #include "server.h"
 
-int make_addr(const char *host, const char *service, struct addrinfo *result);
-int parse_args(int argc, char *argv[], struct forward_server_data *fs_data);
+int parse_args(int argc, char *argv[], struct forward_server_data *fs_data, unsigned int *port);
 
 #endif  // _UTILS_H_
