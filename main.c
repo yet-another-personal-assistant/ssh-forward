@@ -1,15 +1,16 @@
 #include <errno.h>
-#include <netdb.h>
 #include <poll.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
 #include <sys/socket.h>
-#include <sys/types.h>
 #include <unistd.h>
 
 #include <libssh/callbacks.h>
 #include <libssh/server.h>
+
+#include "server.h"
+#include "utils.h"
 
 static int copy_fd_to_chan(socket_t fd, int revents, void *userdata) {
   ssh_channel chan = (ssh_channel)userdata;
@@ -195,80 +196,10 @@ out:
   return result;
 }
 
-int make_addr(const char *host, const char *service, struct addrinfo *result) {
-  struct addrinfo hints, *ai, *rp;
-  hints.ai_family = AF_UNSPEC;
-  hints.ai_socktype = SOCK_STREAM;
-  if (getaddrinfo(host, service, &hints, &ai) != 0) {
-    perror("getaddrinfo");
-    exit(EXIT_FAILURE);
-  }
-
-  bzero(result, sizeof(struct addrinfo));
-
-  for (rp = ai; rp != NULL; rp = rp->ai_next) {
-    int sock = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-    if (sock == -1)
-      continue;
-    if (connect(sock, rp->ai_addr, rp->ai_addrlen) != -1) {
-      close(sock);
-      break;
-    }
-    close(sock);
-  }
-
-  if (rp == NULL) {
-    printf("Could not connect\n");
-    return -1;
-  }
-
-  result->ai_family = rp->ai_family;
-  result->ai_socktype = rp->ai_socktype;
-  result->ai_protocol = rp->ai_protocol;
-  result->ai_addrlen = rp->ai_addrlen;
-  result->ai_addr = malloc(rp->ai_addrlen);
-  if (result->ai_addr == NULL) {
-    perror("malloc addr");
-    exit(EXIT_FAILURE);
-  }
-  memcpy(result->ai_addr, rp->ai_addr, rp->ai_addrlen);
-
-  freeaddrinfo(ai);
-  return 0;
-}
-
 int main(int argc, char *argv[]) {
-  if (argc < 5 || argc > 6) {
-    printf("Usage: %s <user> <key> <host> <port> [<local port>]\n", argv[0]);
-    printf("  user - username to accept\n");
-    printf("  key - public key to authenticate\n");
-    printf("  host, port - where to forward to\n");
-    printf("  local port - where to listen (default 3000)\n");
+  struct forward_server_data fs_data = {0};
+  if (parse_args(argc, argv, &fs_data) == -1)
     exit(EXIT_FAILURE);
-  }
-  unsigned int port;
-  if (argc == 6) {
-    if (sscanf(argv[5], "%d", &port) != 1) {
-      printf("port is not a number: %s\n", argv[5]);
-      exit(EXIT_FAILURE);
-    }
-  } else
-    port = 3000;
-
-  struct addrinfo target = {0};
-  if (make_addr(argv[3], argv[4], &target) == -1)
-    exit(EXIT_FAILURE);
-
-  const char *username = strdup(argv[1]);
-  ssh_key key = ssh_key_new();
-  if (key == NULL) {
-    perror("ssh key new");
-    exit(EXIT_FAILURE);
-  }
-  if (ssh_pki_import_pubkey_file(argv[2], &key) == SSH_ERROR) {
-    perror("ssh key load");
-    exit(EXIT_FAILURE);
-  }
 
   ssh_set_log_level(SSH_LOG_TRACE);
 
@@ -284,7 +215,7 @@ int main(int argc, char *argv[]) {
     goto out;
   }
 
-  res = ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_BINDPORT, &port);
+  res = ssh_bind_options_set(sshbind, SSH_BIND_OPTIONS_BINDPORT, &fs_data.port);
   if (res < 0) {
     printf("ssh bind set port error: %s\n", ssh_get_error(sshbind));
     goto out;
@@ -296,7 +227,7 @@ int main(int argc, char *argv[]) {
     goto out;
   }
 
-  printf("Started sshforward server on port %d\n", port);
+  printf("Started sshforward server on port %u\n", fs_data.port);
 
   ssh_session session = ssh_new();
   while (1) {
@@ -310,7 +241,7 @@ int main(int argc, char *argv[]) {
       perror("fork");
       goto out;
     case 0:
-      exit(child(session, username, key, &target));
+      exit(child(session, fs_data.username, fs_data.key, &fs_data.target));
     default:
       break;
     }

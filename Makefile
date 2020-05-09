@@ -5,7 +5,7 @@ APP = sshforward
 
 all: $(APP)
 
-$(APP): main.o
+$(APP): main.o utils.o
 	$(CC) $(LDFLAGS) -o $@ $^ $(LDLIBS)
 
 clean:
