@@ -6,6 +6,25 @@
 #include "server.h"
 #include "session.h"
 
+static void mainloop(struct forward_server *server) {
+  ssh_session session = ssh_new();
+  while (1) {
+    if (ssh_bind_accept(server->sshbind, session) == SSH_ERROR) {
+      printf("Failed to accept connection: %s\n",
+             ssh_get_error(server->sshbind));
+      return;
+    }
+    switch (fork()) {
+    case -1:
+      perror("fork");
+      return;
+    case 0:
+      exit(handle_session(session, &server->data));
+    default:
+      break;
+    }
+  }
+}
 
 int main(int argc, char *argv[]) {
   ssh_set_log_level(SSH_LOG_TRACE);
@@ -16,30 +35,11 @@ int main(int argc, char *argv[]) {
 
   _ssh_log(SSH_LOG_TRACE, "main", "Server is set up");
 
-  if (ssh_bind_listen(server.sshbind) == SSH_ERROR) {
+  if (ssh_bind_listen(server.sshbind) == SSH_OK) {
+    _ssh_log(SSH_LOG_TRACE, "main", "Server is listening");
+    mainloop(&server);
+  } else
     printf("ssh bind listen error: %s\n", ssh_get_error(server.sshbind));
-    goto out;
-  }
-
-  _ssh_log(SSH_LOG_TRACE, "main", "Server is listening");
-
-  ssh_session session = ssh_new();
-  while (1) {
-    if (ssh_bind_accept(server.sshbind, session) == SSH_ERROR) {
-      printf("Failed to accept connection: %s\n",
-             ssh_get_error(server.sshbind));
-      break;
-    }
-    switch (fork()) {
-    case -1:
-      perror("fork");
-      goto out;
-    case 0:
-      exit(handle_session(session, &server.data));
-    default:
-      break;
-    }
-  }
 
 out:
   if (server.sshbind != NULL)
