@@ -5,6 +5,7 @@
 #include <libssh/libssh.h>
 
 #include "session.h"
+#include "utils.h"
 
 static int copy_fd_to_chan(socket_t fd, int revents, void *userdata) {
   ssh_channel chan = (ssh_channel)userdata;
@@ -22,8 +23,7 @@ static int copy_fd_to_chan(socket_t fd, int revents, void *userdata) {
       fflush(stdout);
       ssh_channel_write(chan, buf, sz);
     }
-  }
-  if (revents & POLLHUP) {
+  } else if (revents & POLLHUP) {
     ssh_channel_close(chan);
     sz = -1;
   }
@@ -72,20 +72,15 @@ struct ssh_channel_callbacks_struct cb = {
 };
 
 int mainloop(ssh_event event, ssh_channel chan, int sock) {
-  int result = -1;
   short events = POLLIN | POLLPRI | POLLERR | POLLHUP | POLLNVAL;
 
   cb.userdata = &sock;
   ssh_callbacks_init(&cb);
   ssh_set_channel_callbacks(chan, &cb);
 
-  if (event == NULL) {
-    printf("Couldn't get an event\n");
-    goto out;
-  }
   if (ssh_event_add_fd(event, sock, events, copy_fd_to_chan, chan) != SSH_OK) {
     printf("Couldn't add an fd to the event: %s\n", ssh_get_error(chan));
-    goto out;
+    return -1;
   }
 
   do {
@@ -94,11 +89,7 @@ int mainloop(ssh_event event, ssh_channel chan, int sock) {
 
   ssh_event_remove_fd(event, sock);
 
-  result = 0;
-out:
-  if (event)
-    ssh_event_free(event);
-  return result;
+  return 0;
 }
 
 struct session_data {
@@ -141,6 +132,17 @@ static ssh_channel channel_open(ssh_session session, void *userdata) {
   return sdata->channel;
 }
 
+static int authenticate(ssh_event event, ssh_session session,
+                        struct session_data *sdata) {
+  ssh_set_auth_methods(session, SSH_AUTH_METHOD_PUBLICKEY);
+  while (!sdata->authenticated || sdata->channel == NULL)
+    if (ssh_event_dopoll(event, 1000) == SSH_ERROR) {
+      _ssh_log(SSH_LOG_PROTOCOL, "authenticate", "authentication failed");
+      return -1;
+    }
+  return 0;
+}
+
 int handle_session(ssh_session session, struct forward_server_data *fs_data) {
   int result = -1;
   ssh_event event = ssh_event_new();
@@ -166,21 +168,13 @@ int handle_session(ssh_session session, struct forward_server_data *fs_data) {
     goto out;
   }
 
-  ssh_set_auth_methods(session, SSH_AUTH_METHOD_PUBLICKEY);
   ssh_event_add_session(event, session);
-
-  while (!sdata.authenticated || sdata.channel == NULL)
-    if (ssh_event_dopoll(event, 1000) == SSH_ERROR)
-      goto out;
-
-  struct addrinfo *addr = &fs_data->target;
-  sdata.sock = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
-  if (sdata.sock == -1) {
-    perror("socket");
+  if (authenticate(event, session, &sdata) == -1)
     goto out;
-  }
-  if (connect(sdata.sock, addr->ai_addr, addr->ai_addrlen) == -1) {
-    perror("connect");
+
+  sdata.sock = socket_connect(&fs_data->target);
+  if (sdata.sock == -1) {
+    perror("socket_connect");
     goto out;
   }
 
