@@ -2,3 +2,5 @@ FROM sshforward-build
 RUN apt-get update && apt-get install -y bear
 WORKDIR /app
 EXPOSE 3000
+ENTRYPOINT ["/bin/bash"]
+CMD []

@@ -25,25 +25,36 @@ Docker containers are used for building/development/deployment.
 
 Can be used to build the application.
 
-*FIXME: add usage example*
+```sh
+# build image
+make image-build
+
+# build application
+docker run --rm -itP -v$(pwd):/app sshforward-build
+```
 
 ### Containerfile.dev
 
 Can be used for development.
 
 ```sh
-docker build -t sshforward-dev -f containerfiles/Containerfile.dev .
-docker run --rm -itP -v$(pwd):/app sshforward-dev
+# build image
+make image-dev
+
+# get libssh header files and generate compile_commads.json
+./scripts/dev.sh
+
+# run development container
+docker run --rm -itP -v$(pwd):/app -v$(pwd)/.libssh-inc:/includes sshforward-dev
 ```
-
-To generate `compile_commands.json` run `make bear` then add
-`-I<path to libssl headers>` and `-I.`.
-
-*FIXME: find some way to automate this*
 
 ### Containerfile
 
 Deploy the application.
+
+```sh
+make image-deploy
+```
 
 *FIXME: need to add files and supply arguments*
 
