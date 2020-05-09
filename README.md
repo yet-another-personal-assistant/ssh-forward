@@ -21,18 +21,18 @@ located in the working directory.
 
 Docker containers are used for building/development/deployment.
 
-### Dockerfile.build
+### Containerfile.build
 
 Can be used to build the application.
 
 *FIXME: add usage example*
 
-### Dockerfile.dev
+### Containerfile.dev
 
 Can be used for development.
 
 ```sh
-docker build -t sshforward-dev -f Dockerfile.dev .
+docker build -t sshforward-dev -f containerfiles/Containerfile.dev .
 docker run --rm -itP -v$(pwd):/app sshforward-dev
 ```
 
@@ -41,7 +41,7 @@ To generate `compile_commands.json` run `make bear` then add
 
 *FIXME: find some way to automate this*
 
-### Dockerfile
+### Containerfile
 
 Deploy the application.
 
