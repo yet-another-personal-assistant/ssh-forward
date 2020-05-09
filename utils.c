@@ -7,7 +7,19 @@
 #include "server.h"
 #include "utils.h"
 
-static int make_addr(const char *host, const char *service, struct addrinfo *result) {
+int socket_connect(struct addrinfo *addr) {
+  int result = socket(addr->ai_family, addr->ai_socktype, addr->ai_protocol);
+  if (result == -1)
+    return -1;
+  if (connect(result, addr->ai_addr, addr->ai_addrlen) == -1) {
+    close(result);
+    return -1;
+  }
+  return result;
+}
+
+static int make_addr(const char *host, const char *service,
+                     struct addrinfo *result) {
   struct addrinfo hints, *ai, *rp;
   hints.ai_family = AF_UNSPEC;
   hints.ai_socktype = SOCK_STREAM;
@@ -19,13 +31,11 @@ static int make_addr(const char *host, const char *service, struct addrinfo *res
   bzero(result, sizeof(struct addrinfo));
 
   for (rp = ai; rp != NULL; rp = rp->ai_next) {
-    int sock = socket(rp->ai_family, rp->ai_socktype, rp->ai_protocol);
-    if (sock == -1)
-      continue;
-    int result = connect(sock, rp->ai_addr, rp->ai_addrlen);
-    close(sock);
-    if (result != -1)
+    int sock = socket_connect(rp);
+    if (sock != -1) {
+      close(sock);
       break;
+    }
   }
 
   if (rp == NULL) {
@@ -56,7 +66,8 @@ static void usage(const char *appname) {
   printf("  local port - where to listen (default 3000)\n");
 }
 
-int parse_args(int argc, char *argv[], struct forward_server_data *fs_data, unsigned int *port) {
+int parse_args(int argc, char *argv[], struct forward_server_data *fs_data,
+               unsigned int *port) {
   switch (argc) {
   case 5:
     *port = 3000;
@@ -86,4 +97,3 @@ int parse_args(int argc, char *argv[], struct forward_server_data *fs_data, unsi
   }
   return 0;
 }
-

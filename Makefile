@@ -1,4 +1,5 @@
 CFLAGS += -Wall -Werror -O3
+LDFLAGS += -flto
 CFLAGS += $(shell pkg-config --cflags libssh)
 LDLIBS += $(shell pkg-config --libs libssh)
 APP = sshforward
