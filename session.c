@@ -53,22 +53,14 @@ static void chan_close(ssh_session session, ssh_channel channel,
   close(fd);
 }
 
-static int chan_pty(ssh_session session, ssh_channel channel, const char *term,
-                    int cols, int rows, int py, int px, void *userdata) {
-  return SSH_OK;
-}
-
-static int chan_shell(ssh_session session, ssh_channel channel,
-                      void *userdata) {
-  return SSH_OK;
-}
+static int just_ok() { return SSH_OK; }
 
 struct ssh_channel_callbacks_struct cb = {
     .channel_data_function = copy_chan_to_fd,
     .channel_eof_function = chan_close,
     .channel_close_function = chan_close,
-    .channel_pty_request_function = chan_pty,
-    .channel_shell_request_function = chan_shell,
+    .channel_pty_request_function = just_ok,
+    .channel_shell_request_function = just_ok,
 };
 
 int mainloop(ssh_event event, ssh_channel chan, int sock) {
