@@ -29,7 +29,7 @@ static void mainloop(struct forward_server *server) {
 int main(int argc, char *argv[]) {
   ssh_set_log_level(SSH_LOG_TRACE);
 
-  struct forward_server server;
+  struct forward_server server = {0};
   if (setup_server(argc, argv, &server) == -1)
     goto out;
 

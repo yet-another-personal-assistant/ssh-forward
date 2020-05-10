@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](http://semver.org/spec/v2.0.0.
 ## [Unreleased]
 ### Changed
 - Renamed and moved Dockerfiles
+### Fixed
+- Segmentation fault on early exit
 
 ## 0.1.0 - 2020-05-09
 ### Added
