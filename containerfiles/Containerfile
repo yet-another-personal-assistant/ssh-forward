@@ -1,14 +1,18 @@
-FROM sshforward-dev as builder
+FROM sshforward-build as builder
+
+ADD https://github.com/coord-e/magicpak/releases/latest/download/magicpak-x86_64-unknown-linux-musl /usr/bin/magicpak
+RUN chmod +x /usr/bin/magicpak
+
 RUN mkdir -p /app
 WORKDIR /app
-COPY . ./
+COPY ./*.c ./*.h Makefile ./
 RUN make
 
-FROM debian:buster-slim
-RUN apt-get update && apt-get install -y libssh-4
-RUN mkdir -p /app
+RUN /usr/bin/magicpak -v /app/sshforward /bundle
+
+FROM busybox
+COPY --from=builder /bundle /.
 RUN mkdir -p /key
 WORKDIR /key
-COPY --from=builder /app/sshforward .
 EXPOSE 3000
 ENTRYPOINT ["/app/sshforward"]
