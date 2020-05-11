@@ -45,7 +45,7 @@ make image-dev
 ./scripts/dev.sh
 
 # run development container
-docker run --rm -itP -v$(pwd):/app -v$(pwd)/.libssh-inc:/includes sshforward-dev
+docker run --rm -itP -v$(pwd):/app sshforward-dev
 ```
 
 ### Containerfile
