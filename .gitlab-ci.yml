@@ -1,0 +1,27 @@
+image: docker:stable
+
+services:
+  - docker:dind
+
+before_script:
+  - docker info
+
+stages:
+  - Build builder
+  - Build app
+
+docker build builder:
+  stage: Build builder
+  before_script:
+  - docker login registry.gitlab.com -u $CI_GITLAB_REG_USER -p $CI_GITLAB_REG_PASS
+  script:
+  - docker build -t registry.gitlab.com/personal-assistant-bot/infrastructure/sshforward-build -f containerfiles/Containerfile.build .
+  after_script:
+  - docker push registry.gitlab.com/personal-assistant-bot/infrastructure/sshforward-build
+
+docker build app:
+  stage: Build app
+  before_script:
+  - docker login registry.gitlab.com -u $CI_GITLAB_REG_USER -p $CI_GITLAB_REG_PASS
+  script:
+  - docker build -t sshforward -f containerfiles/Containerfile .
